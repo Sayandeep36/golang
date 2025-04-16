@@ -18,9 +18,16 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	// Connect to a server
-	nc, _ := nats.Connect("localhost:4222")
-	js, _ := jetstream.New(nc)
-	_, err := js.CreateStream(ctx, jetstream.StreamConfig{
+	nc, err := nats.Connect("localhost:4222")
+	if err != nil {
+		log.Fatal("could not connect to nats", err.Error())
+	}
+	js, err := jetstream.New(nc)
+	if err != nil {
+		log.Fatal("could not create new jet stream", err.Error())
+	}
+
+	_, err = js.CreateStream(ctx, jetstream.StreamConfig{
 		Name:     "salesforce",
 		Subjects: []string{"sfdc.pubsub.in.*"},
 	})

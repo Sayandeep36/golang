@@ -61,8 +61,6 @@ func Login() (*LoginResponse, error) {
 	body.Set("grant_type", cfg.GrantType)
 	body.Set("client_id", cfg.ClientId)
 	body.Set("client_secret", cfg.ClientSecret)
-	body.Set("username", cfg.Username)
-	body.Set("password", cfg.Password)
 
 	ctx, cancelFn := context.WithTimeout(context.Background(), common.OAuthDialTimeout)
 	defer cancelFn()
