@@ -1,14 +1,32 @@
 package main
 
 import (
+	"context"
 	"log"
+	"time"
 
 	"Golang/common"
 	"Golang/grpcclient"
 	"Golang/proto"
+
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 func main() {
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	// Connect to a server
+	nc, _ := nats.Connect("localhost:4222")
+	js, _ := jetstream.New(nc)
+	_, err := js.CreateStream(ctx, jetstream.StreamConfig{
+		Name:     "salesforce",
+		Subjects: []string{"sfdc.pubsub.in.*"},
+	})
+	if err != nil {
+		log.Fatal("could not create NATS stream", err.Error())
+	}
 
 	if common.ReplayPreset == proto.ReplayPreset_CUSTOM && common.ReplayId == nil {
 		log.Fatalf("the replayId variable must be populated when the replayPreset variable is set to CUSTOM")
@@ -65,7 +83,7 @@ func main() {
 		// (i.e., an error occurred) the Subscribe method will return both the most recently processed ReplayId as well as the error message.
 		// The error message will be logged for the user to see and then we will attempt to re-subscribe with the ReplayId on the next iteration
 		// of this for loop
-		curReplayId, err = client.Subscribe(replayPreset, curReplayId)
+		curReplayId, err = client.Subscribe(replayPreset, curReplayId, js)
 		if err != nil {
 			log.Printf("error occurred while subscribing to topic: %v", err)
 		}

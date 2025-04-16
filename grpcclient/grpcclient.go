@@ -3,6 +3,7 @@ package grpcclient
 import (
 	"context"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -16,6 +17,7 @@ import (
 	"Golang/proto"
 
 	"github.com/linkedin/goavro/v2"
+	"github.com/nats-io/nats.go/jetstream"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -121,7 +123,7 @@ func (c *PubSubClient) GetSchema(schemaId string) (*proto.SchemaInfo, error) {
 // fetch data from the topic. This method will continuously consume messages unless an error occurs; if an error does occur then this method will
 // return the last successfully consumed ReplayId as well as the error message. If no messages were successfully consumed then this method will return
 // the same ReplayId that it originally received as a parameter
-func (c *PubSubClient) Subscribe(replayPreset proto.ReplayPreset, replayId []byte) ([]byte, error) {
+func (c *PubSubClient) Subscribe(replayPreset proto.ReplayPreset, replayId []byte, js jetstream.JetStream) ([]byte, error) {
 	ctx, cancelFn := context.WithCancel(c.getAuthContext())
 	defer cancelFn()
 
@@ -184,7 +186,18 @@ func (c *PubSubClient) Subscribe(replayPreset proto.ReplayPreset, replayId []byt
 			// Again, this should be stored in a persistent external datastore instead of a variable
 			curReplayId = event.GetReplayId()
 
-			log.Printf("event body: %+v\n", body)
+			bodyBytes, err := json.Marshal(body)
+			if err != nil {
+				log.Fatal(err)
+			}
+			fmt.Println(string(bodyBytes))
+
+			_, err = js.Publish(ctx, "sfdc.pubsub.in.test"+event.Event.Id, bodyBytes)
+			if err != nil {
+				log.Println("error publishng message to nats stream", err.Error())
+			}
+
+			fmt.Println("------------------------------------")
 
 			// decrement our counter to keep track of how many events have been requested but not yet processed. If we're below our configured
 			// batch size then proactively request more events to stay ahead of the processor
