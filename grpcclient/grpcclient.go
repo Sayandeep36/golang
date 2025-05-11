@@ -78,11 +78,11 @@ func (c *PubSubClient) FetchUserInfo() error {
 }
 
 // Wrapper function around the GetTopic RPC. This will add the OAuth credentials and make a call to fetch data about a specific topic
-func (c *PubSubClient) GetTopic() (*proto.TopicInfo, error) {
+func (c *PubSubClient) GetTopic(topicName string) (*proto.TopicInfo, error) {
 	var trailer metadata.MD
 
 	req := &proto.TopicRequest{
-		TopicName: common.TopicName,
+		TopicName: topicName,
 	}
 
 	ctx, cancelFn := context.WithTimeout(c.getAuthContext(), common.GRPCCallTimeout)
