@@ -123,7 +123,7 @@ func (c *PubSubClient) GetSchema(schemaId string) (*proto.SchemaInfo, error) {
 // fetch data from the topic. This method will continuously consume messages unless an error occurs; if an error does occur then this method will
 // return the last successfully consumed ReplayId as well as the error message. If no messages were successfully consumed then this method will return
 // the same ReplayId that it originally received as a parameter
-func (c *PubSubClient) Subscribe(replayPreset proto.ReplayPreset, replayId []byte, js jetstream.JetStream) ([]byte, error) {
+func (c *PubSubClient) Subscribe(replayPreset proto.ReplayPreset, replayId []byte, js jetstream.JetStream, topicName string) ([]byte, error) {
 	ctx, cancelFn := context.WithCancel(c.getAuthContext())
 	defer cancelFn()
 
@@ -134,7 +134,7 @@ func (c *PubSubClient) Subscribe(replayPreset proto.ReplayPreset, replayId []byt
 	defer subscribeClient.CloseSend()
 
 	initialFetchRequest := &proto.FetchRequest{
-		TopicName:    common.TopicName,
+		TopicName:    topicName,
 		ReplayPreset: replayPreset,
 		NumRequested: common.Appetite,
 	}
@@ -205,7 +205,7 @@ func (c *PubSubClient) Subscribe(replayPreset proto.ReplayPreset, replayId []byt
 			if requestedEvents < common.Appetite {
 				log.Printf("Sending next FetchRequest...")
 				fetchRequest := &proto.FetchRequest{
-					TopicName:    common.TopicName,
+					TopicName:    topicName,
 					NumRequested: common.Appetite,
 				}
 
@@ -252,7 +252,7 @@ func (c *PubSubClient) fetchCodec(schemaId string) (*goavro.Codec, error) {
 }
 
 // Wrapper function around the Publish RPC. This will add the OAuth credentials and produce a single hardcoded event to the specified topic.
-func (c *PubSubClient) Publish(schema *proto.SchemaInfo) error {
+func (c *PubSubClient) Publish(schema *proto.SchemaInfo, topicName string) error {
 	log.Printf("Creating codec from schema...")
 	codec, err := goavro.NewCodec(schema.SchemaJson)
 	if err != nil {
@@ -275,7 +275,7 @@ func (c *PubSubClient) Publish(schema *proto.SchemaInfo) error {
 	var trailer metadata.MD
 
 	req := &proto.PublishRequest{
-		TopicName: common.TopicName,
+		TopicName: topicName,
 		Events: []*proto.ProducerEvent{
 			{
 				SchemaId: schema.GetSchemaId(),
@@ -296,7 +296,7 @@ func (c *PubSubClient) Publish(schema *proto.SchemaInfo) error {
 
 	result := pubResp.GetResults()
 	if result == nil {
-		return fmt.Errorf("nil result returned when publishing to %s", common.TopicName)
+		return fmt.Errorf("nil result returned when publishing to %s", topicName)
 	}
 
 	if err := result[0].GetError(); err != nil {
@@ -307,7 +307,7 @@ func (c *PubSubClient) Publish(schema *proto.SchemaInfo) error {
 }
 
 // Wrapper function around the PublishStream RPC. This will add the OAuth credentials and produce an event to the topic every five seconds
-func (c *PubSubClient) PublishStream(schema *proto.SchemaInfo) error {
+func (c *PubSubClient) PublishStream(schema *proto.SchemaInfo, topicName string) error {
 	log.Printf("Creating codec from schema...")
 	codec, err := goavro.NewCodec(schema.SchemaJson)
 	if err != nil {
@@ -336,7 +336,7 @@ func (c *PubSubClient) PublishStream(schema *proto.SchemaInfo) error {
 	}
 
 	publishRequest := &proto.PublishRequest{
-		TopicName: common.TopicName,
+		TopicName: topicName,
 		Events: []*proto.ProducerEvent{
 			{
 				SchemaId: schema.GetSchemaId(),
@@ -400,7 +400,7 @@ func (c *PubSubClient) PublishStream(schema *proto.SchemaInfo) error {
 				}
 
 				publishRequest := &proto.PublishRequest{
-					TopicName: common.TopicName,
+					TopicName: topicName,
 					Events: []*proto.ProducerEvent{
 						{
 							SchemaId: schema.GetSchemaId(),

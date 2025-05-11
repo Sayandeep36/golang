@@ -64,42 +64,46 @@ func main() {
 
 	log.Printf("Making GetTopic request...")
 
-	topics := [5]string{"/data/ContactChangeEvent", "/data/AccountChangeEvent"}
+	topics := []string{"/data/ContactChangeEvent", "/data/AccountChangeEvent"}
+	for _, topicName := range topics {
+		go run(topicName, client, js)
+	}
+	select {}
+}
 
-	for _, topic := range topics {
-		topic, err := client.GetTopic(topic)
+func run(topicName string, client *grpcclient.PubSubClient, js jetstream.JetStream) {
+
+	topic, err := client.GetTopic(topicName)
+	if err != nil {
+		client.Close()
+		log.Fatalf("could not fetch topic: %v", err)
+	}
+
+	if !topic.GetCanSubscribe() {
+		client.Close()
+		log.Fatalf("this user is not allowed to subscribe to the following topic: %s", topic)
+	}
+
+	curReplayId := common.ReplayId
+	for {
+		log.Printf("Subscribing to topic...")
+
+		// use the user-provided ReplayPreset by default, but if the curReplayId variable has a non-nil value then assume that we want to
+		// consume from a custom offset. The curReplayId will have a non-nil value if the user explicitly set the ReplayId or if a previous
+		// subscription attempt successfully processed at least one event before crashing
+		replayPreset := common.ReplayPreset
+		if curReplayId != nil {
+			replayPreset = proto.ReplayPreset_CUSTOM
+		}
+
+		// In the happy path the Subscribe method should never return, it will just process events indefinitely. In the unhappy path
+		// (i.e., an error occurred) the Subscribe method will return both the most recently processed ReplayId as well as the error message.
+		// The error message will be logged for the user to see and then we will attempt to re-subscribe with the ReplayId on the next iteration
+		// of this for loop
+		curReplayId, err = client.Subscribe(replayPreset, curReplayId, js, topicName)
 		if err != nil {
-			client.Close()
-			log.Fatalf("could not fetch topic: %v", err)
+			log.Printf("error occurred while subscribing to topic: %v", err)
 		}
-
-		if !topic.GetCanSubscribe() {
-			client.Close()
-			log.Fatalf("this user is not allowed to subscribe to the following topic: %s", common.TopicName)
-		}
-
-		curReplayId := common.ReplayId
-		for {
-			log.Printf("Subscribing to topic...")
-
-			// use the user-provided ReplayPreset by default, but if the curReplayId variable has a non-nil value then assume that we want to
-			// consume from a custom offset. The curReplayId will have a non-nil value if the user explicitly set the ReplayId or if a previous
-			// subscription attempt successfully processed at least one event before crashing
-			replayPreset := common.ReplayPreset
-			if curReplayId != nil {
-				replayPreset = proto.ReplayPreset_CUSTOM
-			}
-
-			// In the happy path the Subscribe method should never return, it will just process events indefinitely. In the unhappy path
-			// (i.e., an error occurred) the Subscribe method will return both the most recently processed ReplayId as well as the error message.
-			// The error message will be logged for the user to see and then we will attempt to re-subscribe with the ReplayId on the next iteration
-			// of this for loop
-			curReplayId, err = client.Subscribe(replayPreset, curReplayId, js)
-			if err != nil {
-				log.Printf("error occurred while subscribing to topic: %v", err)
-			}
-		}
-
 	}
 
 }
