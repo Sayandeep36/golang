@@ -1,0 +1,9 @@
+config:
+  jetstream:
+    enabled: true
+    store_dir: /data/jetstream
+
+merge:
+  authoration:
+    users:
+      -nkey: <public_key>
