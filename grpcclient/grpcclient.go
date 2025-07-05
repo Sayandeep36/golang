@@ -123,7 +123,7 @@ func (c *PubSubClient) GetSchema(schemaId string) (*proto.SchemaInfo, error) {
 // fetch data from the topic. This method will continuously consume messages unless an error occurs; if an error does occur then this method will
 // return the last successfully consumed ReplayId as well as the error message. If no messages were successfully consumed then this method will return
 // the same ReplayId that it originally received as a parameter
-func (c *PubSubClient) Subscribe(replayPreset proto.ReplayPreset, replayId []byte, js jetstream.JetStream, topicName string) ([]byte, error) {
+func (c *PubSubClient) Subscribe(replayPreset proto.ReplayPreset, replayId []byte, js jetstream.JetStream, topicName string, kv jetstream.KeyValue) ([]byte, error) {
 	ctx, cancelFn := context.WithCancel(c.getAuthContext())
 	defer cancelFn()
 
@@ -155,6 +155,7 @@ func (c *PubSubClient) Subscribe(replayPreset proto.ReplayPreset, replayId []byt
 	requestedEvents := initialFetchRequest.NumRequested
 
 	// NOTE: the replayId should be stored in a persistent data store rather than being stored in a variable
+	kv.Put(ctx, topicName, replayId)
 	curReplayId := replayId
 	for {
 		log.Printf("Waiting for events...")
@@ -185,6 +186,7 @@ func (c *PubSubClient) Subscribe(replayPreset proto.ReplayPreset, replayId []byt
 
 			// Again, this should be stored in a persistent external datastore instead of a variable
 			curReplayId = event.GetReplayId()
+			kv.Put(ctx, topicName, curReplayId)
 
 			bodyBytes, err := json.Marshal(body)
 			if err != nil {

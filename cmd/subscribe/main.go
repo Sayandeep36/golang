@@ -62,16 +62,28 @@ func main() {
 		log.Fatalf("could not fetch user info: %v", err)
 	}
 
+	kv, _ := js.CreateKeyValue(ctx, jetstream.KeyValueConfig{
+		Bucket: "sfdc-replay-logs",
+	})
+
 	log.Printf("Making GetTopic request...")
 
 	topics := []string{"/data/ContactChangeEvent", "/data/AccountChangeEvent"}
 	for _, topicName := range topics {
-		go run(topicName, client, js)
+
+		go run(topicName, client, js, kv, ctx)
 	}
 	select {}
 }
 
-func run(topicName string, client *grpcclient.PubSubClient, js jetstream.JetStream) {
+func run(topicName string, client *grpcclient.PubSubClient, js jetstream.JetStream, kv jetstream.KeyValue, ctx context.Context) {
+	var replayID, curReplayId []byte
+	entry, err := kv.Get(ctx, topicName)
+	if err == nil {
+		replayID = entry.Value()
+	} else {
+		log.Printf("Error getting key %s: %v", topicName, err)
+	}
 
 	topic, err := client.GetTopic(topicName)
 	if err != nil {
@@ -83,8 +95,12 @@ func run(topicName string, client *grpcclient.PubSubClient, js jetstream.JetStre
 		client.Close()
 		log.Fatalf("this user is not allowed to subscribe to the following topic: %s", topic)
 	}
+	if replayID != nil {
+		curReplayId = replayID
+	} else {
+		curReplayId = common.ReplayId
+	}
 
-	curReplayId := common.ReplayId
 	for {
 		log.Printf("Subscribing to topic...")
 
@@ -100,7 +116,7 @@ func run(topicName string, client *grpcclient.PubSubClient, js jetstream.JetStre
 		// (i.e., an error occurred) the Subscribe method will return both the most recently processed ReplayId as well as the error message.
 		// The error message will be logged for the user to see and then we will attempt to re-subscribe with the ReplayId on the next iteration
 		// of this for loop
-		curReplayId, err = client.Subscribe(replayPreset, curReplayId, js, topicName)
+		curReplayId, err = client.Subscribe(replayPreset, curReplayId, js, topicName, kv)
 		if err != nil {
 			log.Printf("error occurred while subscribing to topic: %v", err)
 		}
