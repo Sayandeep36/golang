@@ -1,0 +1,17 @@
+name: Print Colored Message
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  print-message:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Print colored message
+        run: |
+          echo -e "\033[0;32m✅ SUCCESS: Push to master detected!\033[0m"
+          echo -e "\033[0;34mℹ️  INFO: Starting deployment process...\033[0m"
+          echo -e "\033[0;33m⚠️  WARNING: This is a production branch!\033[0m"
