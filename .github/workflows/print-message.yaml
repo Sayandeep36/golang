@@ -3,7 +3,7 @@ name: Print Colored Message
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   print-message:
